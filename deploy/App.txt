@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>State Editor by Release</title>
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Tue Mar 08 2016 08:21:38 GMT-0700 (MST) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Tue Mar 08 2016 08:21:38 GMT-0700 (MST)";
+        var CHECKSUM = 43421119943;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/* Blob.js
+ * A Blob implementation.
+ * 2014-05-31
+ *
+ * By Eli Grey, http://eligrey.com
+ * By Devin Samarin, https://github.com/eboyjr
+ * License: X11/MIT
+ *   See https://github.com/eligrey/Blob.js/blob/master/LICENSE.md
+ */
+
+/*global self, unescape */
+/*jslint bitwise: true, regexp: true, confusion: true, es5: true, vars: true, white: true,
+ plusplus: true */
+
+/*! @source http://purl.eligrey.com/github/Blob.js/blob/master/Blob.js */
+
+(function (view) {
+    "use strict";
+
+    view.URL = view.URL || view.webkitURL;
+
+    if (view.Blob && view.URL) {
+        try {
+            new Blob;
+            return;
+        } catch (e) {}
+    }
+
+    // Internally we use a BlobBuilder implementation to base Blob off of
+    // in order to support older browsers that only have BlobBuilder
+    var BlobBuilder = view.BlobBuilder || view.WebKitBlobBuilder || view.MozBlobBuilder || (function(view) {
+            var
+                get_class = function(object) {
+                    return Object.prototype.toString.call(object).match(/^\[object\s(.*)\]$/)[1];
+                }
+                , FakeBlobBuilder = function BlobBuilder() {
+                    this.data = [];
+                }
+                , FakeBlob = function Blob(data, type, encoding) {
+                    this.data = data;
+                    this.size = data.length;
+                    this.type = type;
+                    this.encoding = encoding;
+                }
+                , FBB_proto = FakeBlobBuilder.prototype
+                , FB_proto = FakeBlob.prototype
+                , FileReaderSync = view.FileReaderSync
+                , FileException = function(type) {
+                    this.code = this[this.name = type];
+                }
+                , file_ex_codes = (
+                "NOT_FOUND_ERR SECURITY_ERR ABORT_ERR NOT_READABLE_ERR ENCODING_ERR "
+                + "NO_MODIFICATION_ALLOWED_ERR INVALID_STATE_ERR SYNTAX_ERR"
+                ).split(" ")
+                , file_ex_code = file_ex_codes.length
+                , real_URL = view.URL || view.webkitURL || view
+                , real_create_object_URL = real_URL.createObjectURL
+                , real_revoke_object_URL = real_URL.revokeObjectURL
+                , URL = real_URL
+                , btoa = view.btoa
+                , atob = view.atob
+
+                , ArrayBuffer = view.ArrayBuffer
+                , Uint8Array = view.Uint8Array
+                ;
+            FakeBlob.fake = FB_proto.fake = true;
+            while (file_ex_code--) {
+                FileException.prototype[file_ex_codes[file_ex_code]] = file_ex_code + 1;
+            }
+            if (!real_URL.createObjectURL) {
+                URL = view.URL = {};
+            }
+            URL.createObjectURL = function(blob) {
+                var
+                    type = blob.type
+                    , data_URI_header
+                    ;
+                if (type === null) {
+                    type = "application/octet-stream";
+                }
+                if (blob instanceof FakeBlob) {
+                    data_URI_header = "data:" + type;
+                    if (blob.encoding === "base64") {
+                        return data_URI_header + ";base64," + blob.data;
+                    } else if (blob.encoding === "URI") {
+                        return data_URI_header + "," + decodeURIComponent(blob.data);
+                    } if (btoa) {
+                        return data_URI_header + ";base64," + btoa(blob.data);
+                    } else {
+                        return data_URI_header + "," + encodeURIComponent(blob.data);
+                    }
+                } else if (real_create_object_URL) {
+                    return real_create_object_URL.call(real_URL, blob);
+                }
+            };
+            URL.revokeObjectURL = function(object_URL) {
+                if (object_URL.substring(0, 5) !== "data:" && real_revoke_object_URL) {
+                    real_revoke_object_URL.call(real_URL, object_URL);
+                }
+            };
+            FBB_proto.append = function(data/*, endings*/) {
+                var bb = this.data;
+                // decode data to a binary string
+                if (Uint8Array && (data instanceof ArrayBuffer || data instanceof Uint8Array)) {
+                    var
+                        str = ""
+                        , buf = new Uint8Array(data)
+                        , i = 0
+                        , buf_len = buf.length
+                        ;
+                    for (; i < buf_len; i++) {
+                        str += String.fromCharCode(buf[i]);
+                    }
+                    bb.push(str);
+                } else if (get_class(data) === "Blob" || get_class(data) === "File") {
+                    if (FileReaderSync) {
+                        var fr = new FileReaderSync;
+                        bb.push(fr.readAsBinaryString(data));
+                    } else {
+                        // async FileReader won't work as BlobBuilder is sync
+                        throw new FileException("NOT_READABLE_ERR");
+                    }
+                } else if (data instanceof FakeBlob) {
+                    if (data.encoding === "base64" && atob) {
+                        bb.push(atob(data.data));
+                    } else if (data.encoding === "URI") {
+                        bb.push(decodeURIComponent(data.data));
+                    } else if (data.encoding === "raw") {
+                        bb.push(data.data);
+                    }
+                } else {
+                    if (typeof data !== "string") {
+                        data += ""; // convert unsupported types to strings
+                    }
+                    // decode UTF-16 to binary string
+                    bb.push(unescape(encodeURIComponent(data)));
+                }
+            };
+            FBB_proto.getBlob = function(type) {
+                if (!arguments.length) {
+                    type = null;
+                }
+                return new FakeBlob(this.data.join(""), type, "raw");
+            };
+            FBB_proto.toString = function() {
+                return "[object BlobBuilder]";
+            };
+            FB_proto.slice = function(start, end, type) {
+                var args = arguments.length;
+                if (args < 3) {
+                    type = null;
+                }
+                return new FakeBlob(
+                    this.data.slice(start, args > 1 ? end : this.data.length)
+                    , type
+                    , this.encoding
+                );
+            };
+            FB_proto.toString = function() {
+                return "[object Blob]";
+            };
+            FB_proto.close = function() {
+                this.size = 0;
+                delete this.data;
+            };
+            return FakeBlobBuilder;
+        }(view));
+
+    view.Blob = function Blob(blobParts, options) {
+        var type = options ? (options.type || "") : "";
+        var builder = new BlobBuilder();
+        if (blobParts) {
+            for (var i = 0, len = blobParts.length; i < len; i++) {
+                builder.append(blobParts[i]);
+            }
+        }
+        return builder.getBlob(type);
+    };
+}(typeof self !== "undefined" && self || typeof window !== "undefined" && window || this.content || this));
+
+/* FileSaver.js
+ *  A saveAs() FileSaver implementation.
+ *  2014-05-27
+ *
+ *  By Eli Grey, http://eligrey.com
+ *  License: X11/MIT
+ *    See https://github.com/eligrey/FileSaver.js/blob/master/LICENSE.md
+ */
+
+/*global self */
+/*jslint bitwise: true, indent: 4, laxbreak: true, laxcomma: true, smarttabs: true, plusplus: true */
+
+/*! @source http://purl.eligrey.com/github/FileSaver.js/blob/master/FileSaver.js */
+
+var saveAs = saveAs
+        // IE 10+ (native saveAs)
+    || (typeof navigator !== "undefined" &&
+    navigator.msSaveOrOpenBlob && navigator.msSaveOrOpenBlob.bind(navigator))
+        // Everyone else
+    || (function(view) {
+        "use strict";
+        // IE <10 is explicitly unsupported
+        if (typeof navigator !== "undefined" &&
+            /MSIE [1-9]\./.test(navigator.userAgent)) {
+            return;
+        }
+        var
+            doc = view.document
+        // only get URL when necessary in case Blob.js hasn't overridden it yet
+            , get_URL = function() {
+                return view.URL || view.webkitURL || view;
+            }
+            , save_link = doc.createElementNS("http://www.w3.org/1999/xhtml", "a")
+            , can_use_save_link = !view.externalHost && "download" in save_link
+            , click = function(node) {
+                var event = doc.createEvent("MouseEvents");
+                event.initMouseEvent(
+                    "click", true, false, view, 0, 0, 0, 0, 0
+                    , false, false, false, false, 0, null
+                );
+                node.dispatchEvent(event);
+            }
+            , webkit_req_fs = view.webkitRequestFileSystem
+            , req_fs = view.requestFileSystem || webkit_req_fs || view.mozRequestFileSystem
+            , throw_outside = function(ex) {
+                (view.setImmediate || view.setTimeout)(function() {
+                    throw ex;
+                }, 0);
+            }
+            , force_saveable_type = "application/octet-stream"
+            , fs_min_size = 0
+            , deletion_queue = []
+            , process_deletion_queue = function() {
+                var i = deletion_queue.length;
+                while (i--) {
+                    var file = deletion_queue[i];
+                    if (typeof file === "string") { // file is an object URL
+                        get_URL().revokeObjectURL(file);
+                    } else { // file is a File
+                        file.remove();
+                    }
+                }
+                deletion_queue.length = 0; // clear queue
+            }
+            , dispatch = function(filesaver, event_types, event) {
+                event_types = [].concat(event_types);
+                var i = event_types.length;
+                while (i--) {
+                    var listener = filesaver["on" + event_types[i]];
+                    if (typeof listener === "function") {
+                        try {
+                            listener.call(filesaver, event || filesaver);
+                        } catch (ex) {
+                            throw_outside(ex);
+                        }
+                    }
+                }
+            }
+            , FileSaver = function(blob, name) {
+                // First try a.download, then web filesystem, then object URLs
+                var
+                    filesaver = this
+                    , type = blob.type
+                    , blob_changed = false
+                    , object_url
+                    , target_view
+                    , get_object_url = function() {
+                        var object_url = get_URL().createObjectURL(blob);
+                        deletion_queue.push(object_url);
+                        return object_url;
+                    }
+                    , dispatch_all = function() {
+                        dispatch(filesaver, "writestart progress write writeend".split(" "));
+                    }
+                // on any filesys errors revert to saving with object URLs
+                    , fs_error = function() {
+                        // don't create more object URLs than needed
+                        if (blob_changed || !object_url) {
+                            object_url = get_object_url(blob);
+                        }
+                        if (target_view) {
+                            target_view.location.href = object_url;
+                        } else {
+                            window.open(object_url, "_blank");
+                        }
+                        filesaver.readyState = filesaver.DONE;
+                        dispatch_all();
+                    }
+                    , abortable = function(func) {
+                        return function() {
+                            if (filesaver.readyState !== filesaver.DONE) {
+                                return func.apply(this, arguments);
+                            }
+                        };
+                    }
+                    , create_if_not_found = {create: true, exclusive: false}
+                    , slice
+                    ;
+                filesaver.readyState = filesaver.INIT;
+                if (!name) {
+                    name = "download";
+                }
+                if (can_use_save_link) {
+                    object_url = get_object_url(blob);
+                    save_link.href = object_url;
+                    save_link.download = name;
+                    click(save_link);
+                    filesaver.readyState = filesaver.DONE;
+                    dispatch_all();
+                    return;
+                }
+                // Object and web filesystem URLs have a problem saving in Google Chrome when
+                // viewed in a tab, so I force save with application/octet-stream
+                // http://code.google.com/p/chromium/issues/detail?id=91158
+                if (view.chrome && type && type !== force_saveable_type) {
+                    slice = blob.slice || blob.webkitSlice;
+                    blob = slice.call(blob, 0, blob.size, force_saveable_type);
+                    blob_changed = true;
+                }
+                // Since I can't be sure that the guessed media type will trigger a download
+                // in WebKit, I append .download to the filename.
+                // https://bugs.webkit.org/show_bug.cgi?id=65440
+                if (webkit_req_fs && name !== "download") {
+                    name += ".download";
+                }
+                if (type === force_saveable_type || webkit_req_fs) {
+                    target_view = view;
+                }
+                if (!req_fs) {
+                    fs_error();
+                    return;
+                }
+                fs_min_size += blob.size;
+                req_fs(view.TEMPORARY, fs_min_size, abortable(function(fs) {
+                    fs.root.getDirectory("saved", create_if_not_found, abortable(function(dir) {
+                        var save = function() {
+                            dir.getFile(name, create_if_not_found, abortable(function(file) {
+                                file.createWriter(abortable(function(writer) {
+                                    writer.onwriteend = function(event) {
+                                        target_view.location.href = file.toURL();
+                                        deletion_queue.push(file);
+                                        filesaver.readyState = filesaver.DONE;
+                                        dispatch(filesaver, "writeend", event);
+                                    };
+                                    writer.onerror = function() {
+                                        var error = writer.error;
+                                        if (error.code !== error.ABORT_ERR) {
+                                            fs_error();
+                                        }
+                                    };
+                                    "writestart progress write abort".split(" ").forEach(function(event) {
+                                        writer["on" + event] = filesaver["on" + event];
+                                    });
+                                    writer.write(blob);
+                                    filesaver.abort = function() {
+                                        writer.abort();
+                                        filesaver.readyState = filesaver.DONE;
+                                    };
+                                    filesaver.readyState = filesaver.WRITING;
+                                }), fs_error);
+                            }), fs_error);
+                        };
+                        dir.getFile(name, {create: false}, abortable(function(file) {
+                            // delete file if it already exists
+                            file.remove();
+                            save();
+                        }), abortable(function(ex) {
+                            if (ex.code === ex.NOT_FOUND_ERR) {
+                                save();
+                            } else {
+                                fs_error();
+                            }
+                        }));
+                    }), fs_error);
+                }), fs_error);
+            }
+            , FS_proto = FileSaver.prototype
+            , saveAs = function(blob, name) {
+                return new FileSaver(blob, name);
+            }
+            ;
+        FS_proto.abort = function() {
+            var filesaver = this;
+            filesaver.readyState = filesaver.DONE;
+            dispatch(filesaver, "abort");
+        };
+        FS_proto.readyState = FS_proto.INIT = 0;
+        FS_proto.WRITING = 1;
+        FS_proto.DONE = 2;
+
+        FS_proto.error =
+            FS_proto.onwritestart =
+                FS_proto.onprogress =
+                    FS_proto.onwrite =
+                        FS_proto.onabort =
+                            FS_proto.onerror =
+                                FS_proto.onwriteend =
+                                    null;
+
+        view.addEventListener("unload", process_deletion_queue, false);
+        saveAs.unload = function() {
+            process_deletion_queue();
+            view.removeEventListener("unload", process_deletion_queue, false);
+        };
+        return saveAs;
+    }(
+        typeof self !== "undefined" && self
+        || typeof window !== "undefined" && window
+        || this.content
+    ));
+// `self` is undefined in Firefox for Android content script context
+// while `this` is nsIContentFrameMessageManager
+// with an attribute `content` that corresponds to the window
+
+if (typeof module !== "undefined" && module !== null) {
+    module.exports = saveAs;
+} else if ((typeof define !== "undefined" && define !== null) && (define.amd != null)) {
+    define([], function() {
+        return saveAs;
+    });
+}
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Ext.Component',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+     title: "Build Information",
+    
+    renderTpl: "<div id='{id}-infolinkWrap' class='tsinfolink'>i</div>",
+
+    initComponent: function() {
+        this.callParent(arguments);
+       
+    },
+    
+    onRender: function() {
+        this.callParent(arguments);
+        this.mon(this.el,'click',this.onClick,this);
+    },
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+    
+        return chk;
+    },
+    _checkChecksum: function(container) {
+        var me = this;
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        console.log("Checksums don't match!");
+                        if ( me.dialog ) {
+                            me.dialog.add({xtype:'container',html:'Checksums do not match'});
+                        }
+                    }
+                }
+            }
+        });
+    },
+    onClick: function(e) {
+        var me = this;
+        this._checkChecksum(this);
+        
+        var dialog_items = [];
+        
+        if ( this.informationHtml ) {
+            dialog_items.push({
+                xtype:'container',
+                html: this.informationHtml
+            });
+        }
+                
+        dialog_items.push({
+            xtype:'container',
+            html:"This app was created by the Rally Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            dialog_items.push({
+                xtype:'container',
+                html:'Build date/time: ' + APP_BUILD_DATE
+            });
+        }
+        
+        if (this.dialog){this.dialog.destroy();}
+        this.dialog = Ext.create('Rally.ui.dialog.Dialog',{
+            defaults: { padding: 5, margin: 5 },
+            closable: true,
+            draggable: true,
+            title: me.title,
+            items: dialog_items
+        });
+        this.dialog.show();
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define('Rally.technicalservices.AuditStore',{
+    extend: 'Ext.data.Store',
+
+    constructor: function(config) {
+        var snaps_by_oid = {};
+        if (config.snapshots){
+            snaps_by_oid = this.aggregateSnapsByOidForModel(config.snapshots);
+        }
+
+        var data = [],
+            fields = ['FormattedID','ObjectID',"Name","ChangedBy","DateChanged"],
+            prevStateField = "_PreviousValues.ScheduleState",
+            stateField = "ScheduleState",
+            auditStateValue = "Accepted";
+
+
+        _.each(snaps_by_oid, function(snaps, oid){
+            var rec = {FormattedID: null, ObjectID: null, Name: null, ChangedBy: null, DateChanged: null, snap: null};
+            _.each(snaps, function(snap){
+                rec.FormattedID = snap.FormattedID;
+                rec.ObjectID = snap.ObjectID;
+                rec.Name = snap.Name;
+                if (snap[prevStateField] != snap[stateField] && snap[stateField] == auditStateValue){
+                    rec.ChangedBy = snap._User;
+                    rec.DateChanged = snap._ValidFrom
+                }
+                //rec.snap = snap;
+            });
+            data.push(rec);
+        });
+
+        config.data = data;
+        config.fields = [];
+        config.pageSize = data.length;
+        console.log('config',config);
+        _.each(fields, function(field){
+            config.fields.push({name: field});
+        });
+
+        this.callParent(arguments);
+
+    },
+    aggregateSnapsByOidForModel: function(snaps){
+        //Return a hash of objects (key=ObjectID) with all snapshots for the object
+        var snaps_by_oid = {};
+        Ext.each(snaps, function(snap){
+            var oid = snap.ObjectID || snap.get('ObjectID');
+            if (snaps_by_oid[oid] == undefined){
+                snaps_by_oid[oid] = [];
+            }
+            snaps_by_oid[oid].push(snap.getData());
+
+        });
+        return snaps_by_oid;
+    }
+});
+Ext.define('Rally.technicalservices.FileUtilities', {
+    singleton: true,
+    logger: new Rally.technicalservices.Logger(),
+    saveCSVToFile:function(csv,file_name,type_object){
+        if (type_object == undefined){
+            type_object = {type:'text/csv;charset=utf-8'};
+        }
+        var blob = new Blob([csv],type_object);
+        saveAs(blob,file_name);
+    },
+
+    saveTextAsFile: function(textToWrite, fileName, options)
+    {
+        var options = Ext.merge( { type:'text/plain' }, options);
+        console.log(options);
+        var textFileAsBlob = new Blob([textToWrite], options);
+        var fileNameToSaveAs = fileName;
+
+        var downloadLink = document.createElement("a");
+        downloadLink.download = fileNameToSaveAs;
+        downloadLink.innerHTML = "Download File";
+        if (window.webkitURL != null)
+        {
+            // Chrome allows the link to be clicked
+            // without actually adding it to the DOM.
+            downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+        }
+        else
+        {
+            // Firefox requires the link to be added to the DOM
+            // before it can be clicked.
+            downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+            downloadLink.onclick = this.destroyClickedElement;
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+        }
+        downloadLink.click();
+    },
+    destroyClickedElement: function(event)
+    {
+        document.body.removeChild(event.target);
+    },
+    convertDataArrayToCSVText: function(data_array, requestedFieldHash){
+
+        var text = '';
+        Ext.each(Object.keys(requestedFieldHash), function(key){
+            text += requestedFieldHash[key] + ',';
+        });
+        text = text.replace(/,$/,'\n');
+
+        Ext.each(data_array, function(d){
+            Ext.each(Object.keys(requestedFieldHash), function(key){
+                if (d[key]){
+                    if (typeof d[key] === 'object'){
+                        if (d[key].FormattedID) {
+                            text += Ext.String.format("\"{0}\",",d[key].FormattedID );
+                        } else if (d[key].Name) {
+                            text += Ext.String.format("\"{0}\",",d[key].Name );
+                        } else if (!isNaN(Date.parse(d[key]))){
+                            text += Ext.String.format("\"{0}\",",Rally.util.DateTime.formatWithDefaultDateTime(d[key]));
+                        }else {
+                            text += Ext.String.format("\"{0}\",",d[key].toString());
+                        }
+                    } else {
+                        text += Ext.String.format("\"{0}\",",d[key] );
+                    }
+                } else {
+                    text += ',';
+                }
+            },this);
+            text = text.replace(/,$/,'\n');
+        },this);
+        return text;
+    },
+    /*
+     * will render using your grid renderer.  If you want it to ignore the grid renderer,
+     * have the column set _csvIgnoreRender: true
+     */
+    getCSVFromGrid:function(grid){
+        var deferred = Ext.create('Deft.Deferred');
+        var store = grid.getStore();
+
+        var columns = grid.columns;
+        var column_names = [];
+        var headers = [];
+
+        var csv = [];
+
+        Ext.Array.each(columns,function(column){
+            if ( column.dataIndex || column.renderer ) {
+                column_names.push(column.dataIndex);
+                if ( column.csvText ) {
+                    headers.push(column.csvText);
+                } else {
+                    headers.push(column.text);
+                }
+            }
+        });
+
+        csv.push('"' + headers.join('","') + '"');
+
+        var mock_meta_data = {
+            align: "right",
+            classes: [],
+            cellIndex: 9,
+            column: null,
+            columnIndex: 9,
+            innerCls: undefined,
+            recordIndex: 5,
+            rowIndex: 5,
+            style: "",
+            tdAttr: "",
+            tdCls: "x-grid-cell x-grid-td x-grid-cell-headerId-gridcolumn-1029 x-grid-cell-last x-unselectable",
+            unselectableAttr: "unselectable='on'"
+        }
+
+        for ( var i=0; i<store.getCount(); i++ ) {
+            var record = store.getAt(i);
+
+            var node_values = [];
+            Ext.Array.each(columns,function(column){
+                if ( column.dataIndex) {
+                    var column_name = column.dataIndex;
+                    var display_value = record.get(column_name);
+
+                    if ( !column._csvIgnoreRender && column.renderer ) {
+                        display_value = column.renderer(display_value,mock_meta_data,record, 0, 0, store, grid.getView());
+                    }
+                    node_values.push(display_value);
+                } else {
+                    var display_value = null;
+                    if ( !column._csvIgnoreRender && column.renderer ) {
+                        display_value = column.renderer(display_value,mock_meta_data,record,record, 0, 0, store, grid.getView());
+                        node_values.push(display_value);
+                    }
+                }
+            },this);
+            csv.push('"' + node_values.join('","') + '"');
+        }
+        return  csv.join('\r\n');
+    }
+});
+
+Ext.define("state-editors-by-release", {
+    extend: 'Rally.app.App',
+
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    defaults: { margin: 10 },
+
+    config: {
+        defaultSettings: {
+            settingsScopeType: null
+        }
+    },
+
+    fetchList: ['FormattedID','Name','_User','_PreviousValues.ScheduleState', "ScheduleState","_ValidFrom", "Iteration", "Project","Release","_SnapshotNumber"],
+    wsapiFetchList: ['FormattedID','Name','ScheduleState','Project','Iteration','Release'],
+
+    onTimeboxScopeChange: function(timebox){
+        this.logger.log('onTimeboxScopeChange',this.useDashboardScope, timebox, this.scopeType);
+        if (this.useDashboardScope && timebox && timebox.type === this.scopeType){
+            this._updateApp(timebox);
+        }
+    },
+    launch: function() {
+
+        var context = this.getContext();
+        this.removeAll();
+
+        var settingsScopeType = this.getSetting('settingsScopeType') || null,
+            hasScope = this._hasScope();
+
+        this.logger.log('launch', settingsScopeType, hasScope);
+        if (settingsScopeType === null && !hasScope){
+            this.add({
+                xtype: 'container',
+                html: 'Please select a scope type in the App settings.'
+            });
+            return;
+        }
+        if (settingsScopeType === null){
+            this.scopeType = this.getContext().getTimeboxScope().type;
+        } else {
+            this.scopeType = settingsScopeType;
+        }
+        this.useDashboardScope = hasScope && settingsScopeType === null
+        this._addComponents(this.useDashboardScope);
+
+        this.onTimeboxScopeChange(context.getTimeboxScope() || null);
+    },
+    _hasScope: function() {
+        var context = this.getContext();
+        this.logger.log('_hasScope', context.getTimeboxScope());
+        if (context.getTimeboxScope() && (context.getTimeboxScope().getType() === 'release' || context.getTimeboxScope().getType() === 'iteration' )){
+            return true;
+        }
+        return false;
+    },
+    _addComponents: function(hasTimeboxScope){
+
+        this.logger.log('_addComponents');
+
+        if (!this.down('#ct-header')){
+            var header = this.add({
+                xtype: 'container',
+                itemId: 'ct-header',
+                layout: {
+                    type: 'hbox'
+                }
+            });
+
+            if (!hasTimeboxScope){
+                if (this.scopeType === 'release'){
+                    header.add({
+                        xtype: 'rallyreleasecombobox',
+                        storeConfig: {
+                            limit: 'Infinity'
+                        },
+                        listeners: {
+                            scope: this,
+                            change: this._updateApp
+                        }
+                    });
+                } else {
+                    header.add({
+                        xtype: 'rallyiterationcombobox',
+                        storeConfig: {
+                            limit: 'Infinity'
+                        },
+                        listeners: {
+                            scope: this,
+                            change: this._updateApp
+                        }
+                    });
+                }
+            }
+
+            header.add({
+                xtype: 'rallybutton',
+                text: 'Export',
+                style: {
+                    float: 'right'
+                },
+                width: 75,
+                listeners: {
+                    scope: this,
+                    click: this._export
+                }
+            });
+        }
+
+        if (this.down('#ct-display')){
+            this.down('#ct-display').removeAll();
+        } else {
+           this.add({xtype: 'container',itemId:'ct-display'});
+        }
+    },
+    _export: function(){
+        var grid = this.down('rallygrid');
+        if (grid){
+            var filename = Ext.String.format('export-{0}.csv',Rally.util.DateTime.format(new Date(), 'Y-m-d'));
+            var csv = Rally.technicalservices.FileUtilities.getCSVFromGrid(grid);
+            Rally.technicalservices.FileUtilities.saveCSVToFile(csv,filename);
+        }
+    },
+    _updateApp: function(timebox){
+        var record = timebox && timebox.getRecord();
+        this.logger.log('_updateApp',record);
+        this._addComponents();
+        this._fetchData(record);
+    },
+
+    _fetchData: function(record){
+
+        if (this.down('#ct-display')){
+            this.down('#ct-display').removeAll();
+        }
+        this.setLoading(true);
+
+        var promises = [this._fetchCurrentTimeboxRecords(record), this._fetchSnapshots()],
+            timeboxName = record ? record.get('Name') : null;
+
+        Deft.Promise.all(promises).then({
+            scope: this,
+            success: function(results){
+                this.logger.log('_fetchData promises returned', results);
+                this._aggregateSnapshots(results[1], results[0], timeboxName);
+                this.setLoading(false);
+            },
+            failure: function(operation){
+                this.setLoading(false);
+                Rally.ui.notify.Notifier.showError({message: 'Error(s) loading data for release: ' + operation.error.errors.join(',')});
+            }
+        });
+    },
+    _getStartDateName: function(timeboxType){
+        if (timeboxType === 'Release'){
+            return 'ReleaseStartDate';
+        }
+        return 'StartDate';
+    },
+    _getEndDateName: function(timeboxType){
+        if (timeboxType === 'Release'){
+            return 'ReleaseDate';
+        }
+        return 'EndDate';
+
+    },
+    _fetchCurrentTimeboxRecords: function(timebox){
+        var deferred = Ext.create('Deft.Deferred'),
+            timeboxType = this.scopeType === 'release' ? 'Release' : 'Iteration',
+            filters = [{
+                property: timeboxType,
+                value: null
+            }];
+
+        if (timebox){
+            filters = [{
+                property: timeboxType + '.Name',
+                value: timebox.get('Name')
+            //},{
+            //    property: timeboxType + '.' + this._getStartDateName(timeboxType),
+            //    value: timebox.get(this._getStartDateName(timeboxType))
+            //},{
+            //    property: timeboxType + '.' + this._getEndDateName(timeboxType),
+            //    value: timebox.get(this._getEndDateName(timeboxType))
+            }];
+        }
+
+        var store = Ext.create('Rally.data.wsapi.Store',{
+            model: 'HierarchicalRequirement',
+            fetch: this.wsapiFetchList,
+            limit: 'Infinity',
+            filters: filters
+        });
+        this.logger.log('_fetchCurrentTimeboxRecords', filters);
+        store.load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                } else {
+                    deferred.reject(operation);
+                }
+            }
+        });
+        return deferred;
+    },
+    _fetchSnapshots: function(){
+        var deferred= Ext.create('Deft.Deferred'),
+            destinationState = "Accepted";
+
+        if (this.transitionSnapshots){
+            deferred.resolve(this.transitionSnapshots);
+        } else {
+
+           this.logger.log('_fetchSnapshots', destinationState);
+           var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+                fetch: this.fetchList,
+                limit: "Infinity",
+                findConfig: {
+                    "_TypeHierarchy": 'HierarchicalRequirement',
+                    $or: [
+                        {"_PreviousValues.ScheduleState": {$gte: destinationState}, "ScheduleState": {$lt: destinationState}},
+                        {"ScheduleState": {$gte: destinationState}, "_PreviousValues.ScheduleState": {$lt: destinationState}}
+                    ],
+                    "_ProjectHierarchy": this.getContext().getProject().ObjectID
+                },
+                sort: {
+                    "_ValidFrom": 1
+                },
+               removeUnauthorizedSnapshots: true,
+                hydrate: ["Project","Iteration","_PreviousValues.ScheduleState","ScheduleState","Release"]
+            });
+            store.load({
+                scope: this,
+                callback: function(records, operation, success){
+                    this.logger.log('load successful?', success, records, operation);
+                    if (success) {
+                        this.transitionSnapshots = records;
+                        deferred.resolve(records);
+                    } else {
+                        this.transitionSnapshots = undefined;
+                        deferred.reject(operation);
+                    }
+
+                }
+            });
+        }
+        return deferred;
+    },
+    _fetchStatePrecedence: function(stateField){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Rally.data.ModelFactory.getModel({
+            type: 'HierarchicalRequirement',
+            success: function(model) {
+                var allowedValues = [];
+                model.getField(stateField).getAllowedValueStore().load({
+                    callback: function (records, operation, success) {
+                        Ext.Array.each(records, function (allowedValue) {
+                            //each record is an instance of the AllowedAttributeValue model
+                            allowedValues.push(allowedValue.get('StringValue'));
+                        });
+                        deferred.resolve(allowedValues);
+                    }
+                });
+            }
+        });
+        return deferred;
+    },
+    _aggregateSnapshots: function(snapshots, currentData, timeboxName){
+
+        var snaps_by_oid = {},
+            scopeType = this.scopeType;
+        if (snapshots){
+            snaps_by_oid = this.aggregateSnapsByOidForModel(snapshots, currentData);
+        }
+        this.logger.log('aggregateSnapshots', timeboxName);
+        var data = [],
+            prevStateField = "_PreviousValues.ScheduleState",
+            stateField = "ScheduleState",
+            auditStateValue = "Accepted";
+
+        this._fetchStatePrecedence(stateField).then({
+            scope: this,
+            success: function(allowedValues){
+
+                var user_oids = [],
+                    auditStateIndex = _.indexOf(allowedValues, auditStateValue);
+
+                _.each(snaps_by_oid, function(snaps, oid){
+                    var rec = {FormattedID: null, ObjectID: null, Name: null, ChangedByOid: null, DateChanged: null, snap: null, Iteration: null, Project: null, FirstName: '', LastName: '', UserName: ''};
+                    _.each(snaps, function(snap) {
+                        rec.FormattedID = snap.FormattedID;
+                        rec.ObjectID = snap.ObjectID;
+                        rec.Name = snap.Name;
+                        rec.Project = snap.Project || '';
+                        rec.Iteration = snap.Iteration || '';
+                        rec.ScheduleState = snap.ScheduleState;
+                        rec.Release = null;
+                        if (snap.Release){
+                            rec.Release = snap.Release.Name || snap.Release;
+                        }
+                        rec.Iteration = null;
+                        if (snap.Iteration){
+                            rec.Iteration = snap.Iteration.Name || snap.Iteration;
+                        }
+
+                        var prevStateIndex = _.indexOf(allowedValues,snap[prevStateField]),
+                            stateIndex = _.indexOf(allowedValues, snap[stateField]);
+
+                        /**
+                         * This needs to cover 3 scenarios:
+                         * 1 - transition from a lower state to the audit state
+                         * 2 - transition from a lower state to a state beyond the audit state
+                         * 3 - transition from a higher state to the audit state
+                         * Note, we do not want to capture editor when going from the audit state to a higher state
+                         */
+                        if (((snap[prevStateField] && snap[prevStateField].length > 0)||snap._SnapshotNumber == 0) &&  //since we are also pulling current release records, we need to ignore what looks like the state transition for those.
+                            prevStateIndex != stateIndex && stateIndex >= auditStateIndex &&
+                            ((prevStateIndex < auditStateIndex) || (stateIndex == auditStateIndex))){
+
+                            if (snap._User && !Ext.Array.contains(user_oids, snap._User)){
+                                user_oids.push(snap._User);
+                            }
+
+                            rec.ChangedByOid = snap._User;
+                            rec.DateChanged = snap._ValidFrom;
+                        }
+                        rec.snap = snap;
+                    });
+
+                    //They would like to not see last accepted if the story is not in an accepted state or above.
+                    if ((_.indexOf(allowedValues, rec.ScheduleState) < auditStateIndex)){
+                        rec.ChangedByOid = null;
+                        rec.DateChanged = null;
+                    }
+                    if (scopeType === 'release' && rec.Release == timeboxName){ //they only want to see records whose current release value matches the desired value.
+                        data.push(rec);
+                    }
+                    if (scopeType === 'iteration' && rec.Iteration == timeboxName){ //they only want to see records whose current release value matches the desired value.
+                        data.push(rec);
+                    }
+                });
+
+                var config = {};
+                config["data"] = data;
+                config["pageSize"] = data.length;
+
+                this._hydrateUsers(config, user_oids);
+            }
+        });
+    },
+    _hydrateUsers: function(config, users){
+        this.logger.log('_hydrateUsers',users);
+        this._fetchUsers(users).then({
+            scope: this,
+            success: function(records){
+                var userHash = {};
+                _.each(records, function(r){
+                    userHash[r.get('ObjectID')] = {
+                        UserName: r.get('UserName') || '',
+                        FirstName: r.get('FirstName') || '',
+                        LastName: r.get('LastName') || '',
+                        ObjectID: r.get('ObjectID')
+                    };
+                });
+
+                _.each(config.data, function(rec){
+                    var oid = rec["ChangedByOid"] || 0;
+
+                    rec["UserName"] = oid > 0 ? (userHash[oid] ? userHash[oid].UserName || '' : 'User ' + oid ) : '';
+                    rec["FirstName"] = (userHash[oid] ? userHash[oid].FirstName || '' : '');
+                    rec["LastName"] = (userHash[oid] ? userHash[oid].LastName || '' : '');
+                });
+
+                this._buildGrid(config);
+
+            },
+            failure: function(errorMsg){
+                Rally.ui.notify.Notifier({message: "Error hydrating users:  " + operation.error.errors.join(',')});
+            }
+        });
+    },
+    _buildGrid: function(config){
+        this.logger.log('_buildGrid',config);
+
+        var store = Ext.create('Rally.data.custom.Store', config);
+
+        if (this.down('#rally-grid')){
+            this.down('#rally-grid').destroy();
+        }
+
+        var grid = this.down('#ct-display').add({
+            xtype: 'rallygrid',
+            itemId: 'rally-grid',
+            store: Ext.create('Rally.data.custom.Store', {
+                data: config.data,
+                autoLoad: true,
+                remoteSort: false,
+                remoteFilter: false,
+                pageSize: config.pageSize,
+                width: '75%'
+            }),
+            columnCfgs: [
+                {dataIndex: 'FormattedID', text: 'FormattedID'},
+                {dataIndex: 'Name', text: 'Name', flex: 1},
+                {
+                    dataIndex: 'ChangedByOid',
+                    width: "20%",
+                    text: 'Accepted By',
+                    renderer: function(v,m,r){
+
+                        if (r.get('UserName')){
+                            return Ext.String.format("{0} {1} ({2})", r.get('FirstName'), r.get('LastName'), r.get('UserName'));
+                        }
+                        return '';
+                    }
+                },
+                {
+                    dataIndex: 'ScheduleState', text: 'Schedule State'
+                },
+                {dataIndex: 'DateChanged', text: 'Last Accepted Date', width: '20%',renderer: function(v){
+                    if (v){
+                        return Rally.util.DateTime.formatWithDefaultDateTime(Rally.util.DateTime.fromIsoString(v));
+                    }
+                    return '';
+
+                }},
+                {
+                    dataIndex: 'Project', text: 'Project', renderer: function(v){ if (v){return v.Name || '';}}
+                }
+
+            ],
+            showPagingToolbar: false
+        });
+    },
+
+    _fetchUsers: function(users){
+        var deferred = Ext.create('Deft.Deferred'),
+            filters = [],
+            promises =[];
+
+        for (var i=0; i<users.length; i++){
+            filters.push({
+                property:'ObjectID',
+                value: users[i]
+            });
+
+            if (i % 10 == 0 || i == users.length -1){
+                var user_filter = Rally.data.wsapi.Filter.or(filters);
+                promises.push(this._fetchUserChunk(user_filter));
+                filters = [];
+            }
+        }
+
+        Deft.Promise.all(promises).then({
+            scope: this,
+            success: function(records){
+                deferred.resolve(_.flatten(records));
+            },
+            failure: function(operation){
+                deferred.reject(operation)
+            }
+        });
+        return deferred;
+    },
+    _fetchUserChunk: function(user_filter){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var user_store = Ext.create('Rally.data.wsapi.Store',{
+            model: 'User',
+            fetch: ['UserName','FirstName','LastName','ObjectID'],
+            filters: user_filter
+        });
+        user_store.load({
+            scope: this,
+            callback: function(records, operation, success){
+                if (success) {
+                    deferred.resolve(records);
+                } else {
+                    deferred.reject(operation);
+                }
+            }
+        });
+        return deferred;
+    },
+    aggregateSnapsByOidForModel: function(snaps, currentData){
+        //Return a hash of objects (key=ObjectID) with all snapshots for the object, put the current wsapi data last.
+
+        var snaps_by_oid = {};
+        Ext.each(snaps, function(snap){
+
+            var oid = snap.ObjectID || snap.get('ObjectID');
+            if (snaps_by_oid[oid] == undefined){
+                snaps_by_oid[oid] = [];
+            }
+            snaps_by_oid[oid].push(snap.getData());
+
+        });
+        Ext.each(currentData, function(r){
+            var oid = r.get('ObjectID');
+            if (snaps_by_oid[oid] == undefined){
+                snaps_by_oid[oid] = [];
+            }
+            snaps_by_oid[oid].push(r.getData());
+        });
+        return snaps_by_oid;
+    },
+    getSettingsFields: function() {
+        var store = Ext.create('Ext.data.Store',{
+            data: [{name: 'Release', value: 'release'},{name: 'Iteration', value:'iteration'}],
+            fields: ['name','value']
+        }),
+            allowBlank = this._hasScope();
+
+
+        return [{
+            xtype: 'rallycombobox',
+            store: store,
+            name: 'settingsScopeType',
+            fieldLabel: 'Scope Type',
+            labelAlign: 'right',
+            width: 300,
+            displayField: 'name',
+            valueField: 'value',
+            allowNoEntry: allowBlank,
+            noEntryText: ' -- Use Dashboard Scope --'
+        }];
+    },
+    getOptions: function() {
+        return [
+            {
+                text: 'About...',
+                handler: this._launchInfo,
+                scope: this
+            }
+        ];
+    },
+
+    _launchInfo: function() {
+        if ( this.about_dialog ) { this.about_dialog.destroy(); }
+        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
+    },
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        this.launch();
+    }
+});
+
+            
+               Rally.launchApp('state-editors-by-release', {
+                   name: 'State Editor by Release'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+    </style>
+
+</head>
+<body></body>
+</html>
